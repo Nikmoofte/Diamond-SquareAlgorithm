@@ -17,10 +17,10 @@ Shader tSquare;
 unsigned uScreenWidth = GetSystemMetrics(SM_CXSCREEN);
 unsigned uiScreenHeight = GetSystemMetrics(SM_CYSCREEN);
 
-uint16_t uMapSize = 5; //7 max
+uint16_t uMapSize = 12; //12 max
 const uint16_t uVrtexCount = 4;
 const uint16_t uCoorCount = 3;
-float iRougness = 0.25f;
+float iRougness = 0.2f;
 
 auto tProgStart = std::chrono::high_resolution_clock::now();
 
@@ -95,6 +95,16 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
 	
 	uint64_t uRealMapSize = pow(2.0f, uMapSize) + 1;
 
+	tSquare.init(c_cVertexFilePath, c_cFragmentFilePath);
+
+	unsigned VBO, VAO, EBO;
+
+	glGenVertexArrays(1, &VAO);
+	glGenBuffers(1, &VBO);
+	glGenBuffers(1, &EBO);
+
+	glBindVertexArray(VAO);
+
 	float* Map = new float[uRealMapSize * uRealMapSize * uCoorCount];
 	InitMap(Map, uRealMapSize);
 
@@ -103,8 +113,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
 		0, 1, uRealMapSize,
 		uRealMapSize, 1, uRealMapSize + 1
 	};
-
-
 
 
 	srand(time(NULL));
@@ -141,22 +149,34 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
 		uSquareCount *= 4;
 	}
 
-
-
-	tSquare.init(c_cVertexFilePath, c_cFragmentFilePath);
-
-	unsigned VBO, VAO, EBO;
-
-	glGenVertexArrays(1, &VAO);
-	glGenBuffers(1, &VBO);
-	glGenBuffers(1, &EBO);
-
-	glBindVertexArray(VAO);
-
 	glBindBuffer(GL_ARRAY_BUFFER, VBO);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * uRealMapSize * uRealMapSize * uCoorCount, Map, GL_STATIC_DRAW);
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), static_cast<void*>(0));
 	glEnableVertexAttribArray(0);
+
+	delete[] Map;
+
+
+	uint64_t uNumOfSqrs = (uRealMapSize - 1) * (uRealMapSize - 1);
+	unsigned* uaFullIndxs = new unsigned[uNumOfSqrs * 6];
+
+
+	for (size_t i = 0; i < (uRealMapSize - 1); i++)
+	{
+		for (size_t j = 0; j < (uRealMapSize - 1); j++)
+		{
+			for (size_t k = 0; k < 6; k++)
+			{
+				uint32_t indx = k + j * 6 + i * (uRealMapSize - 1) * 6;
+				uaFullIndxs[indx] = uaIndecies[k] + j + i * uRealMapSize;
+			}
+		}
+	}
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned) * uNumOfSqrs * 6, uaFullIndxs, GL_STATIC_DRAW);
+
+	delete[] uaFullIndxs;
 
 
 	tSquare.use();
@@ -184,6 +204,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
 
 		if (GetKeyState('R') < 0)
 		{
+			float* Map = new float[uRealMapSize * uRealMapSize * uCoorCount];
+			InitMap(Map, uRealMapSize);
 
 			srand(time(NULL));
 			GetVertIndx(Map, uRealMapSize, 0, 0)[1] = GetRandHeight(uRealMapSize);
@@ -221,15 +243,19 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
 			glBufferData(GL_ARRAY_BUFFER, sizeof(float)* uRealMapSize* uRealMapSize* uCoorCount, Map, GL_STATIC_DRAW);
 			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), static_cast<void*>(0));
 			glEnableVertexAttribArray(0);
+
+			delete[] Map;
 		}
+
+		
 
 		glEnable(GL_DEPTH_TEST);
 		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		glUniformMatrix4fv(glGetUniformLocation(tSquare.GetProgramID(), "model"), 1, GL_FALSE, glm::value_ptr(model));
-		uint64_t uNumOfSqrs = (uRealMapSize - 1) * (uRealMapSize - 1);
-		for (int i = 0; i < uRealMapSize - 1; ++i)
+		
+		/*for (int i = 0; i < uRealMapSize - 1; ++i)
 		{
 			int arr[6];
 			for (size_t j = 0; j < uRealMapSize - 1; j++)
@@ -240,9 +266,9 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
 				glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(arr), arr, GL_DYNAMIC_DRAW);
 				glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, NULL);
 			}
-		}
+		}*/
 
-		//glDrawElements(GL_TRIANGLES, uNumOfSqrs * 6, GL_UNSIGNED_INT, 0);
+		glDrawElements(GL_TRIANGLES, uNumOfSqrs * 6, GL_UNSIGNED_INT, 0);
 		
 
 		SwapBuffers(DC);
@@ -251,7 +277,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
 		SetWindowText(hwnd, std::to_wstring(1 / tFrameTime.count()).c_str());
 	}
 
-	delete[] Map;
 }
 
 LRESULT WinProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)

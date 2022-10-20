@@ -9,7 +9,7 @@ Camera::Camera(const glm::vec3& vPos, uint16_t uScreenWidth, uint16_t uScreenHei
 	CameraPos = vPos;
 	this->uScreenHeight = uScreenHeight;
 	this->uScreenWidth = uScreenWidth;
-	proj = glm::perspective(glm::radians(90.f), static_cast<float>(uScreenWidth) / uScreenHeight, 0.01f, 1000.0f);
+	proj = glm::perspective(glm::radians(90.f), static_cast<float>(uScreenWidth) / uScreenHeight, 0.01f, 10000.0f);
 
 	view = lookAt(CameraPos, CameraPos + CameraFront, CameraUp);
 
@@ -64,9 +64,21 @@ void Camera::MouseControl()
 	glUniformMatrix4fv(glGetUniformLocation(uProgId, "view"), 1, GL_FALSE, glm::value_ptr(view));
 }
 
+const glm::vec3& Camera::GetPos()
+{
+	// TODO: вставьте здесь оператор return
+}
+
 void Camera::KeyboardControl(std::chrono::duration<float> tFrameTime)
 {
-	float fMovSpeed = 100.f * tFrameTime.count();
+
+	float fSpeed = 10.f;
+
+	if (GetKeyState(VK_SHIFT) > 0)
+		fSpeed = 1000.0f;
+
+	float fMovSpeed = fSpeed * tFrameTime.count();
+
 
 	
 	if (GetKeyState('W') < 0)

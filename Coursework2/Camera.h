@@ -12,6 +12,7 @@ public:
 	void KeyboardControl(std::chrono::duration<float> tFrameTime);
 	void ChangeProgramID();
 	void SetPos(const glm::vec3& vNewPos);
+
 	const glm::vec3& GetPos();
 
 private:
@@ -34,5 +35,6 @@ private:
 	int16_t iDeltaY;
 	float fYaw = 0;
 	float fPitch = 0;
+
 };
 
