@@ -4,7 +4,7 @@
 #include <windows.h>
 
 
-Camera::Camera(const glm::vec3& vPos, uint16_t uScreenWidth, uint16_t uScreenHeight, unsigned uProgramID)
+Camera::Camera(const glm::vec3& vPos, uint16_t uScreenWidth, uint16_t uScreenHeight)
 {
 	CameraPos = vPos;
 	this->uScreenHeight = uScreenHeight;
@@ -12,11 +12,6 @@ Camera::Camera(const glm::vec3& vPos, uint16_t uScreenWidth, uint16_t uScreenHei
 	proj = glm::perspective(glm::radians(90.f), static_cast<float>(uScreenWidth) / uScreenHeight, 0.01f, 10000.0f);
 
 	view = lookAt(CameraPos, CameraPos + CameraFront, CameraUp);
-
-	uProgId = uProgramID;
-
-	glUniformMatrix4fv(glGetUniformLocation(uProgId, "proj"), 1, GL_FALSE, glm::value_ptr(proj));
-	glUniformMatrix4fv(glGetUniformLocation(uProgId, "view"), 1, GL_FALSE, glm::value_ptr(view));
 }
 
 void Camera::MouseControl()
@@ -61,25 +56,43 @@ void Camera::MouseControl()
 
 	CameraFront = normalize(direction);
 	view = lookAt(CameraPos, CameraPos + CameraFront, CameraUp);
-	glUniformMatrix4fv(glGetUniformLocation(uProgId, "view"), 1, GL_FALSE, glm::value_ptr(view));
+
 }
 
 const glm::vec3& Camera::GetPos()
 {
 	// TODO: вставьте здесь оператор return
+	return glm::vec3(0);
+}
+
+glm::mat4& Camera::GetProjMat()
+{
+	return proj;
+}
+
+glm::mat4& Camera::GetViewMat()
+{
+	return view;
 }
 
 void Camera::KeyboardControl(std::chrono::duration<float> tFrameTime)
 {
 
-	float fSpeed = 10.f;
+	float fSpeed = 100.f;
 
-	if (GetKeyState(VK_SHIFT) > 0)
+	if (GetKeyState(VK_SHIFT) < 0)
 		fSpeed = 1000.0f;
 
 	float fMovSpeed = fSpeed * tFrameTime.count();
 
-
+	if (GetKeyState(VK_SPACE) < 0)
+	{
+		CameraPos += fMovSpeed * CameraUp;
+	}
+	if (GetKeyState(VK_CONTROL) < 0)
+	{
+		CameraPos -= fMovSpeed * CameraUp;
+	}
 	
 	if (GetKeyState('W') < 0)
 	{

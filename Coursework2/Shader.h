@@ -14,8 +14,8 @@ public:
 private:
 	struct Exception
 	{
-		Exception(const char* msg, int num) : message(msg), number(num) {}
-		const char* message;
+		Exception(const wchar_t* msg, int num) : message(msg), number(num) {}
+		const wchar_t* message;
 		int number;
 	};
 

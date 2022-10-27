@@ -4,14 +4,19 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <chrono>
 
+
 class Camera
 {
+
+
 public:
-	Camera(const glm::vec3& vPos, uint16_t uScreenWidth, uint16_t uSreenWidth, unsigned uProgramID);
+	Camera(const glm::vec3& vPos, uint16_t uScreenWidth, uint16_t uSreenWidth);
 	void MouseControl();
 	void KeyboardControl(std::chrono::duration<float> tFrameTime);
 	void ChangeProgramID();
 	void SetPos(const glm::vec3& vNewPos);
+	glm::mat4& GetProjMat();
+	glm::mat4& GetViewMat();
 
 	const glm::vec3& GetPos();
 

@@ -9,6 +9,8 @@
 
 const char* c_cVertexFilePath = "vertex.vs";
 const char* c_cFragmentFilePath = "fragment.fs";
+const char* c_WaterFragmentFilePath = "Wfragment.fs";
+const char* c_WaterVertexFilePath = "Wvertex.vs";	
 
 HDC DC;
 HGLRC RC;
@@ -17,10 +19,10 @@ Shader tSquare;
 unsigned uScreenWidth = GetSystemMetrics(SM_CXSCREEN);
 unsigned uiScreenHeight = GetSystemMetrics(SM_CYSCREEN);
 
-uint16_t uMapSize = 12; //12 max
+uint16_t uMapSize = 10; //13 max
 const uint16_t uVrtexCount = 4;
 const uint16_t uCoorCount = 3;
-float iRougness = 0.2f;
+float fRougness = 0.2f;
 
 auto tProgStart = std::chrono::high_resolution_clock::now();
 
@@ -28,13 +30,15 @@ LRESULT WinProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 float* GetVertIndx(float* pfMap, const uint64_t uRealMapSize, const uint64_t X, const uint64_t Y);
 void InitMap(float* pfMap, const uint64_t uRealMapSize);
+void GenerateMap(const uint64_t uRealMapSize);
 void DiamondStep(float* pfMap, const uint64_t uRealMapSize, const uint64_t uUpLeft, const uint64_t uSideLength);
 void SquareStep(float* pfMap, const uint64_t uRealMapSize, const uint64_t uUpLeft, const uint64_t uSideLength);
+void PostProcessing(float* pfMap, const uint64_t uRealMapSize);
 
 float GetRandHeight(float length)
 {
 	const uint64_t accuracy = 10000;
-	return length * iRougness - 2 * float(rand() % accuracy) / accuracy * length * iRougness;
+	return length * fRougness - 2 * float(rand() % accuracy) / accuracy * length * fRougness;
 }
 
 struct Exception
@@ -80,22 +84,14 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
 		MessageBox(NULL, L"Failed to create Handel!", L"ERROR!", MB_ICONERROR | MB_OK);
 		return 1;
 	}
-	
-
-	
-	float faVertecies[] =
-	{
-		1.0f, 1.0f,  1.0f,
-	   -1.0f, 1.0f,  1.0f,
-	   -1.0f, 1.0f, -1.0f,
-		1.0f, 1.0f, -1.0f,
-	};
-
 
 	
 	uint64_t uRealMapSize = pow(2.0f, uMapSize) + 1;
 
+
+
 	tSquare.init(c_cVertexFilePath, c_cFragmentFilePath);
+
 
 	unsigned VBO, VAO, EBO;
 
@@ -105,61 +101,19 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
 
 	glBindVertexArray(VAO);
 
-	float* Map = new float[uRealMapSize * uRealMapSize * uCoorCount];
-	InitMap(Map, uRealMapSize);
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+
+	GenerateMap(uRealMapSize);
+
+
+	uint64_t uNumOfSqrs = (uRealMapSize - 1) * (uRealMapSize - 1);
+	unsigned* uaFullIndxs = new unsigned[uNumOfSqrs * 6];
 
 	unsigned uaIndecies[] =
 	{
 		0, 1, uRealMapSize,
 		uRealMapSize, 1, uRealMapSize + 1
 	};
-
-
-	srand(time(NULL));
-	GetVertIndx(Map, uRealMapSize, 0, 0)[1] = GetRandHeight(uRealMapSize);
-	GetVertIndx(Map, uRealMapSize, uRealMapSize - 1, 0)[1] = GetRandHeight(uRealMapSize);
-	GetVertIndx(Map, uRealMapSize, uRealMapSize - 1, uRealMapSize -1)[1] = GetRandHeight(uRealMapSize);
-	GetVertIndx(Map, uRealMapSize, 0, uRealMapSize - 1)[1] = GetRandHeight(uRealMapSize);
-
-	uint64_t uSideLength = uRealMapSize;
-	uint64_t uSquareCount = 1;
-	while (ceil(static_cast<float>(uSideLength) / 2) > 1)
-	{
-		uint64_t uUpLeftIndex = 0;
-		uint64_t uRowIndex = 0;
-		int i = 0;
-		while (i < uSquareCount)
-		{
-			DiamondStep(Map, uRealMapSize, uUpLeftIndex, uSideLength);
-			SquareStep(Map, uRealMapSize, uUpLeftIndex, uSideLength);
-			uUpLeftIndex += uSideLength;
-			if (uUpLeftIndex < uRowIndex + uRealMapSize)
-			{
-				uUpLeftIndex--;
-			}
-			else
-			{
-				uUpLeftIndex -= uRealMapSize;
-				uRowIndex += uRealMapSize * (uSideLength - 1);
-				uUpLeftIndex += uRealMapSize * (uSideLength - 1);
-			}
-			i++;
-		}
-		uSideLength = ceil(static_cast<float>(uSideLength) / 2);
-		uSquareCount *= 4;
-	}
-
-	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * uRealMapSize * uRealMapSize * uCoorCount, Map, GL_STATIC_DRAW);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), static_cast<void*>(0));
-	glEnableVertexAttribArray(0);
-
-	delete[] Map;
-
-
-	uint64_t uNumOfSqrs = (uRealMapSize - 1) * (uRealMapSize - 1);
-	unsigned* uaFullIndxs = new unsigned[uNumOfSqrs * 6];
-
 
 	for (size_t i = 0; i < (uRealMapSize - 1); i++)
 	{
@@ -176,18 +130,59 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned) * uNumOfSqrs * 6, uaFullIndxs, GL_STATIC_DRAW);
 
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindVertexArray(0);
 	delete[] uaFullIndxs;
 
 
+	Shader sdrtWater(c_WaterVertexFilePath, c_WaterFragmentFilePath);
+
+	float faVertecies[] =
+	{
+		0.0f,  0.0f,  0.0f,
+		0.0f,  0.0f,  uRealMapSize,
+		uRealMapSize,  0.0f,  0.0f,
+		uRealMapSize,  0.0f,  uRealMapSize,
+		0.0f,  0.0f,  uRealMapSize,
+		uRealMapSize,  0.0f,  0.0f,
+	};
+
+	unsigned WaterVAO, WaterVBO;
+
+	glGenVertexArrays(1, &WaterVAO);
+	glGenBuffers(1, &WaterVBO);
+
+	glBindVertexArray(WaterVAO);
+
+	glBindBuffer(GL_ARRAY_BUFFER, WaterVBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(faVertecies), faVertecies, GL_STATIC_DRAW);
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 3, static_cast<void*>(0));
+
+
+	glBindVertexArray(0);
+
+	
+	glUniform1f(glGetUniformLocation(tSquare.GetProgramID(), "fMaxHeight"), fRougness* uRealMapSize);
+
+
+	Camera cam(glm::vec3(0.0f, 1.0f, 0.0f), uScreenWidth, uiScreenHeight);
 	tSquare.use();
-	Camera cam(glm::vec3(0.0f, 1.0f, 0.0f), uScreenWidth, uiScreenHeight, tSquare.GetProgramID());
-	ShowWindow(hwnd, SW_SHOW);
+	
+	glUniformMatrix4fv(glGetUniformLocation(tSquare.GetProgramID(), "proj"), 1, GL_FALSE, glm::value_ptr(cam.GetProjMat()));
+
+	sdrtWater.use();
+	glUniformMatrix4fv(glGetUniformLocation(sdrtWater.GetProgramID(), "proj"), 1, GL_FALSE, glm::value_ptr(cam.GetProjMat()));
+
+
+
+	ShowWindow(hwnd, nCmdShow);
 	std::chrono::duration<float> tFrameTime = std::chrono::high_resolution_clock::now() - tProgStart;
 	bool bQuit = false;
 	while (!bQuit)
 	{
 		auto tFrameBegin = std::chrono::high_resolution_clock::now();
-		glm::mat4 model = glm::mat4(1.0f);
+
 		while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE))
 		{
 			if (msg.message == WM_QUIT)
@@ -196,65 +191,32 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
 			DispatchMessage(&msg);
 		}
 
+		glm::mat4 model = glm::mat4(1.0f);
+
+
 		cam.MouseControl();
 		cam.KeyboardControl(tFrameTime);
+		
+
 
 		if (GetKeyState(VK_ESCAPE) < 0)
 			SendMessage(hwnd, WM_DESTROY, NULL, NULL);
 
+
+		glBindVertexArray(VAO);
+		glBindBuffer(GL_ARRAY_BUFFER, VBO);
 		if (GetKeyState('R') < 0)
 		{
-			float* Map = new float[uRealMapSize * uRealMapSize * uCoorCount];
-			InitMap(Map, uRealMapSize);
-
-			srand(time(NULL));
-			GetVertIndx(Map, uRealMapSize, 0, 0)[1] = GetRandHeight(uRealMapSize);
-			GetVertIndx(Map, uRealMapSize, uRealMapSize - 1, 0)[1] = GetRandHeight(uRealMapSize);
-			GetVertIndx(Map, uRealMapSize, uRealMapSize - 1, uRealMapSize - 1)[1] = GetRandHeight(uRealMapSize);
-			GetVertIndx(Map, uRealMapSize, 0, uRealMapSize - 1)[1] = GetRandHeight(uRealMapSize);
-
-			uSideLength = uRealMapSize;
-			uSquareCount = 1;
-			while (ceil(static_cast<float>(uSideLength) / 2) > 1)
-			{
-				uint64_t uUpLeftIndex = 0;
-				uint64_t uRowIndex = 0;
-				int i = 0;
-				while (i < uSquareCount)
-				{
-					DiamondStep(Map, uRealMapSize, uUpLeftIndex, uSideLength);
-					SquareStep(Map, uRealMapSize, uUpLeftIndex, uSideLength);
-					uUpLeftIndex += uSideLength;
-					if (uUpLeftIndex < uRowIndex + uRealMapSize)
-					{
-						uUpLeftIndex--;
-					}
-					else
-					{
-						uUpLeftIndex -= uRealMapSize;
-						uRowIndex += uRealMapSize * (uSideLength - 1);
-						uUpLeftIndex += uRealMapSize * (uSideLength - 1);
-					}
-					i++;
-				}
-				uSideLength = ceil(static_cast<float>(uSideLength) / 2);
-				uSquareCount *= 4;
-			}
-			glBufferData(GL_ARRAY_BUFFER, sizeof(float)* uRealMapSize* uRealMapSize* uCoorCount, Map, GL_STATIC_DRAW);
-			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), static_cast<void*>(0));
-			glEnableVertexAttribArray(0);
-
-			delete[] Map;
+			GenerateMap(uRealMapSize);
 		}
 
-		
 
 		glEnable(GL_DEPTH_TEST);
-		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+		glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-		glUniformMatrix4fv(glGetUniformLocation(tSquare.GetProgramID(), "model"), 1, GL_FALSE, glm::value_ptr(model));
-		
+
+	
 		/*for (int i = 0; i < uRealMapSize - 1; ++i)
 		{
 			int arr[6];
@@ -268,8 +230,19 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
 			}
 		}*/
 
+
+		tSquare.use();
+		glUniformMatrix4fv(glGetUniformLocation(tSquare.GetProgramID(), "model"), 1, GL_FALSE, glm::value_ptr(model));
+		glUniformMatrix4fv(glGetUniformLocation(tSquare.GetProgramID(), "view"), 1, GL_FALSE, glm::value_ptr(cam.GetViewMat()));
 		glDrawElements(GL_TRIANGLES, uNumOfSqrs * 6, GL_UNSIGNED_INT, 0);
-		
+
+
+		sdrtWater.use();
+		glUniformMatrix4fv(glGetUniformLocation(sdrtWater.GetProgramID(), "model"), 1, GL_FALSE, glm::value_ptr(model));
+		glUniformMatrix4fv(glGetUniformLocation(sdrtWater.GetProgramID(), "view"), 1, GL_FALSE, glm::value_ptr(cam.GetViewMat()));
+		glBindVertexArray(WaterVAO);
+		glBindBuffer(GL_VERTEX_ARRAY, WaterVBO);
+		glDrawArrays(GL_TRIANGLES, 0, 6);
 
 		SwapBuffers(DC);
 		auto tFrameEnd = std::chrono::high_resolution_clock::now();
@@ -342,6 +315,8 @@ LRESULT WinProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
 float* GetVertIndx(float* pfMap, const uint64_t uRealMapSize, const uint64_t X, const uint64_t Y)
 {
+	if (X < 0 || X >= uRealMapSize || Y < 0 || Y >= uRealMapSize)
+		return nullptr;
 	uint64_t uLineSize = uCoorCount * uRealMapSize;
 	return pfMap + uCoorCount * X + Y * uLineSize;
 }
@@ -358,6 +333,59 @@ void InitMap(float* pfMap, const uint64_t uRealMapSize)
 			fVertCoord[2] = i;
 		}
 	}
+}
+
+void GenerateMap(const uint64_t uRealMapSize)
+{
+	float* Map = new float[uRealMapSize * uRealMapSize * uCoorCount];
+	InitMap(Map, uRealMapSize);
+
+	srand(time(NULL));
+	GetVertIndx(Map, uRealMapSize, 0, 0)[1] = GetRandHeight(uRealMapSize);
+	GetVertIndx(Map, uRealMapSize, uRealMapSize - 1, 0)[1] = GetRandHeight(uRealMapSize);
+	GetVertIndx(Map, uRealMapSize, uRealMapSize - 1, uRealMapSize - 1)[1] = GetRandHeight(uRealMapSize);
+	GetVertIndx(Map, uRealMapSize, 0, uRealMapSize - 1)[1] = GetRandHeight(uRealMapSize);
+
+	uint64_t uSideLength = uRealMapSize;
+	uint32_t uSquareCount = 1;
+	while (ceil(static_cast<float>(uSideLength) / 2) > 1)
+	{
+		uint64_t uUpLeftIndex = 0;
+		uint64_t uRowIndex = 0;
+		int i = 0;
+		while (i < uSquareCount)
+		{
+			DiamondStep(Map, uRealMapSize, uUpLeftIndex, uSideLength);
+			SquareStep(Map, uRealMapSize, uUpLeftIndex, uSideLength);
+			uUpLeftIndex += uSideLength;
+			if (uUpLeftIndex < uRowIndex + uRealMapSize)
+			{
+				uUpLeftIndex--;
+			}
+			else
+			{
+				uUpLeftIndex -= uRealMapSize;
+				uRowIndex += uRealMapSize * (uSideLength - 1);
+				uUpLeftIndex += uRealMapSize * (uSideLength - 1);
+			}
+			i++;
+		}
+		uSideLength = ceil(static_cast<float>(uSideLength) / 2);
+		uSquareCount *= 4;
+	}
+
+
+	PostProcessing(Map, uRealMapSize);
+	PostProcessing(Map, uRealMapSize);
+
+
+
+	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * uRealMapSize * uRealMapSize * uCoorCount, Map, GL_STATIC_DRAW);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), static_cast<void*>(0));
+	glEnableVertexAttribArray(0);
+
+
+	delete[] Map;
 }
 
 void DiamondStep(float* pfMap, const uint64_t uRealMapSize, const uint64_t uUpLeft, const uint64_t uSideLength)
@@ -473,4 +501,39 @@ void SquareStep(float* pfMap, const uint64_t uRealMapSize, const uint64_t uUpLef
 	pfMap[uFillIndex * uCoorCount + 1] = GetHeight(pfMap, uRealMapSize, uSideLength, uFillIndex);
 	
 
+}
+
+void PostProcessing(float* pfMap, const uint64_t uRealMapSize)
+{
+	for (int i = 0; i < uRealMapSize; i++)
+	{
+		for (int j = 0; j < uRealMapSize; j++)
+		{
+			float SmoothHeight = 0.0f;
+			int X = j - 1, Y = i - 1;
+			uint16_t counter = 0;
+			while (Y < i + 2)
+			{
+				float* pfHeight = GetVertIndx(pfMap, uRealMapSize, X, Y);
+				if (pfHeight != nullptr)
+				{
+					SmoothHeight += pfHeight[1];
+					++counter;
+				}
+				++X;
+				if (X > j + 1)
+				{
+					++Y;
+					X = j - 1;
+				}
+				else if (X == j && Y == i)
+					++X;
+			}
+
+			SmoothHeight /= counter;
+
+			GetVertIndx(pfMap, uRealMapSize, j, i)[1] = SmoothHeight;
+
+		}
+	}
 }
